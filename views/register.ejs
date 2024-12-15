@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register</title>
+    <link rel="icon" href="/assets/gail.png" type="image/x-icon" >
+
+
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  </head>
+  <style>
+    .logo{
+        padding-top: 30px;
+        padding-left: 30px;
+
+    }
+</style>
+  <body class="bg-gray-100">
+    <img src="/assets/gail.png" alt="Logo" class="logo" width="120px" height="200px" />
+
+    <div class="min-h-screen flex items-center justify-center bg-gray-100">
+      <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-6 text-center">Create User</h1>
+        <form action="/signup" method="post">
+          <div class="mb-4">
+            <label for="username" class="block text-gray-700 font-medium mb-2">Username:</label>
+            <input
+              type="text"
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:border-blue-300"
+              id="username"
+              name="username"
+              required
+            />
+          </div>
+          
+          <div class="mb-4">
+            <label for="email" class="block text-gray-700 font-medium mb-2">Email:</label>
+            <input
+              type="email"
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:border-blue-300"
+              id="email"
+              name="email"
+              required
+            />
+          </div>
+          <div class="mb-6">
+            <label for="password" class="block text-gray-700 font-medium mb-2">Password:</label>
+            <input
+              type="password"
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:border-blue-300"
+              id="password"
+              name="password"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring focus:border-blue-300"
+          >
+            Create
+          </button>
+        </form>
+        
+    </div>
+  </body>
+</html>

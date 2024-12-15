@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dco</title>
+    <link
+    href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css"
+    rel="stylesheet"
+/>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #sidebar {
+            min-width: 250px;
+            max-width: 250px;
+            background: #ffffff;
+            color: #000000;
+            box-shadow: 0px 0px 20px 0px #0129701A;
+
+            transition: all 0.3s;
+        }
+        #sidebar.active {
+            margin-left: -250px;
+        }
+        #sidebar .sidebar-header {
+            padding: 20px;
+            box-shadow: 0px 0px 20px 0px #0129701A;
+
+            background: #ffffff;
+        }
+        #sidebar .list-group-item {
+           
+          
+            background: none;
+          font-weight: 600;
+            border: none;
+           margin: 0 9px 0 9px;
+           border-radius: 10px;
+            color: #000000;
+            transition:all 0.3s ease ;
+        }
+        #sidebar .list-group-item1{
+            margin: 10px 0 0 0;
+          font-weight: 600;
+            color: #012970;
+        }
+        #sidebar .list-group-item1 .btn{
+            text-decoration: none;
+            font-weight: 600;
+            color: #012970;
+            border: none;
+        }
+        #sidebar .list-group-item a{
+            text-decoration: none;
+          font-weight: 600;
+
+        }
+        #sidebar .list-group-item:hover {
+            
+            background: #EDF1F7;
+        }
+        #sidebar .dropdown-menu {
+            background: #ffffff;
+            border: none;
+        }
+        #sidebar .dropdown-item {
+            color: #020202;
+            border: none;
+        }
+        #sidebar .dropdown-item:hover {
+            background: #ffffff;
+        }
+        #content {
+            flex: 1;
+            padding: 10px;
+            overflow: auto;
+        }
+        .navbar {
+            background: #ffffff;
+            color: #000000;
+        }
+       
+            .logo{
+            z-index: 1000;
+            position: absolute;
+            bottom: 10%;
+            left:2.5%; 
+        }
+.list-group-item .ri-building-4-line,
+.list-group-item .ri-map-2-line,
+.list-group-item .ri-calendar-line,
+.list-group-item .ri-user-line,
+.list-group-item .ri-map-pin-5-line,
+.list-group-item .ri-pass-pending-line{
+    color: #012970;
+    font-size: 1.5em;
+}
+span{
+    margin-left: 7px;
+}
+h3{
+    color: #012970;
+
+}
+.se span{
+    color: #012970;
+    
+   
+}
+    </style>
+</head>
+<body>
+
+    <div id="sidebar" class="bg-white">
+        <div class="sidebar-header text-center py-4">
+            <h3>ADMIN</h3>
+        </div>
+        <ul class="list-group list-group-flush ">
+            <li class="list-group-item"><a href="/admin/dashboard" class="text-#012970 font-semibold "><i class="ri-building-4-line"></i><span>Dashboard</span></a></li>
+            <li class="list-group-item"><a href="/admin/geo" class="text-#012970 font-semibold "><i class="ri-map-2-line"><span></i>Map</span></a></li>
+            <li class="list-group-item"><a href="/admin/calendar" class="text-#012970 font-semibold "><i class="ri-calendar-line"></i><span></i>Attendance</span></a></li>
+            <!-- <li class="list-group-item"><a href="#" class="text-white">Clients</a></li> -->
+            <li class="list-group-item">
+                <a href="#userSubmenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle text-#012970 font-semibold"> Management</a>
+                <ul class="collapse list-unstyled" id="userSubmenu">
+                    <li class="list-group-item1">
+                        <a href="/admin/users" class="text-#012970 m-0 p-0 font-semibold"><i class="ri-user-line"></i><span>Users</span></a>
+                    </li>
+                    <li class="list-group-item1">
+                        <a href="/admin-o/show/geofence" class="text-#012970 m-0 p-0 font-semibold"><i class="ri-map-pin-5-line"></i><span>Location</span></a>
+                    </li>
+                    <li class="list-group-item1">
+                        <a href="/user/show/temp-geo" class="text-#012970 m-0 p-0 font-semibold"><i class="ri-pass-pending-line"></i><span>Request</span></a>
+                    </li>
+                </ul>
+            </li>
+            <li class="list-group-item">
+                <a href="#userSubmenuu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle text-#012970 font-semibold">Settings</a>
+                <ul class="collapse list-unstyled" id="userSubmenuu">
+                    
+                    <li class="list-group-item1 text-#4154F1">
+
+                        <form action="/logout" method="post">
+
+                            <button type="submit" class="text-#4154F1 m-0 p-0 se font-semibold"><span>Logout</span></button>
+                        </form>
+                       
+                    </li>
+                </ul>
+            </li>
+            <li>
+    <img src="/assets/gail.png" alt="Logo"class="logo" width="160px" height="120px" >
+</li>
+            <!-- <li class="list-group-item"><a href="#" class="text-white">Settings</a></li> -->
+        </ul>
+    </div>
+
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <script>
+        document.getElementById('sidebarCollapse').addEventListener('click', function () {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+    </script>
+</body>
+</html>

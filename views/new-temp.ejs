@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Temp Geo</title>
+    <link rel="stylesheet" href="/path/to/bootstrap.min.css"> <!-- Include Bootstrap or other CSS if needed -->
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Submit Geolocation Data</h1>
+        <form id="geoForm">
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
+        </form>
+    </div>
+
+    <script>
+        function submitForm() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const longitude = position.coords.longitude;
+                    const latitude = position.coords.latitude;
+                    const description = document.getElementById('description').value;
+
+                    // Prepare data for the POST request
+                    const data = {
+                        longitude: longitude,
+                        latitude: latitude,
+                        description: description
+                    };
+
+                    // Send the POST request
+                    fetch('/user/new/temp-geo', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.text())
+                    .then(result => {
+                        alert('Data submitted successfully!');
+                        console.log(result);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                }, function(error) {
+                    alert('Unable to retrieve your location');
+                });
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+    </script>
+</body>
+</html>

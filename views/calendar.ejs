@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Axios for HTTP requests -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <!-- jsPDF and jsPDF-AutoTable for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <title>Attendance</title>
+    <link rel="icon" href="/assets/sv_crop.png" type="image/x-icon" />
+
+    <style>
+      body {
+        box-sizing: border-box;
+        background-color: #f6f9ff;
+        margin: 0;
+        padding: 0;
+      }
+      .maal-apni {
+        background-color: #f0f4fb;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+      }
+      .over {
+        overflow-y: scroll;
+        width: 100%;
+        height: 100%;
+        background-color: #edf1f7;
+        padding: 40px;
+      }
+      h1 {
+        font-family: "Poppins", sans-serif;
+        text-align: left;
+        color: #4154f1;
+      }
+      p {
+        font-size: 1.2em;
+        margin-left: 3px;
+        margin-bottom: 5px;
+      }
+      .re {
+        background-color: white;
+        padding: 20px;
+        border-radius: 11px;
+        display: flex;
+        gap: 50px;
+        flex-direction: row;
+      }
+      #date {
+        width: 150px;
+        height: 40px;
+        padding: 5px;
+        border: 1px solid rgba(184, 184, 184, 0.539);
+        border-radius: 9px;
+        transition: all 0.3s;
+      }
+      #date:hover {
+        border: 1.5px solid #012970;
+      }
+      #branch {
+        width: 150px;
+        height: 40px;
+        padding: 5px;
+        border: 1px solid rgba(184, 184, 184, 0.539);
+        border-radius: 9px;
+        transition: all 0.3s;
+      }
+      #branch:hover {
+        border: 1.5px solid #012970;
+      }
+      table {
+        width: 100%;
+        border: none;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+      }
+      th {
+        border-bottom: inset;
+        border-color: rgba(217, 217, 217, 0.406);
+        background-color: #edf1f7;
+        color: rgb(0, 0, 0);
+      }
+      #user-container {
+        border-radius: 12px;
+        padding: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <%- include('partials/sidebar') %>
+    <div class="over">
+      <div class="container">
+        <form id="f" class="mb-4">
+          <h1 class="mt-8">Attendance</h1>
+          <p>Report</p>
+          <div class="mb-3 re">
+            <input type="date" name="date" id="date" placeholder="Date" required />
+            <button type="submit" class="btn btn-primary">Generate</button>
+          </div>
+        </form>
+        <div id="user-container"></div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.querySelector("#f");
+      const userContainer = document.getElementById("user-container");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        userContainer.innerHTML = "";
+        const date = form.elements.date.value;
+
+        try {
+          const res = await axios.post(`/admin/calendar/${date}`);
+          console.log(res);
+
+          if (res.data.length > 0) {
+            // Create table structure
+            const div = document.createElement("div");
+
+            const table = document.createElement("table");
+            const thead = document.createElement("thead");
+            const tbody = document.createElement("tbody");
+            const h2 = document.createElement("h2");
+            const btn = document.createElement("button");
+            const { jsPDF } = window.jspdf;
+
+            btn.innerHTML = `<a href="#" class="btn btn-success" id="download-pdf">Download PDF</a>`;
+            btn.style.border = "none";
+            h2.innerHTML = `<h2>Report</h2>`;
+
+            // Table header
+            thead.innerHTML = `
+              <tr style='color: #EDF1F7'>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Working Hours</th>
+                <th>Attendance</th>
+              </tr>
+            `;
+            table.appendChild(thead);
+
+            // Append rows to the tbody
+            res.data.forEach((user) => {
+              // Calculate total working hours
+              const signinTime = new Date(`1970-01-01T${user.signin_time}Z`);
+              const signoutTime = new Date(`1970-01-01T${user.signout_time}Z`);
+              const totalHours = (signoutTime - signinTime) / (1000 * 60 * 60); // Convert milliseconds to hours
+
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td style='background-color: white'>${user.username}</td>
+                <td style='background-color: white'>${user.email}</td>
+                <td style='background-color: white'>${totalHours.toFixed(2)} hours</td>
+                <td style='background-color: white'>${user.accounted_for}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            // Append tbody to the table
+            table.appendChild(tbody);
+            table.style.padding = "30px";
+            table.style.borderRadius = "12px";
+
+            // Append table to the container
+            userContainer.appendChild(h2);
+            userContainer.appendChild(table);
+            userContainer.appendChild(btn);
+            userContainer.style.backgroundColor = "white";
+
+            // Handle PDF download
+            document.getElementById("download-pdf").addEventListener("click", () => {
+              const doc = new jsPDF();
+              doc.autoTable({ html: "table" });
+              doc.save("report.pdf");
+            });
+          } else {
+            userContainer.innerHTML = "<p>No data found for the selected date.</p>";
+          }
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      });
+    </script>
+  </body>
+</html>

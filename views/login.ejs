@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <link rel="icon" href="/assets/gail.png" type="image/x-icon" >
+
+
+
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<style>
+    .logo{
+        padding-top: 30px;
+        padding-left: 30px;
+
+    }
+</style>
+<body class="bg-gray-100">
+    <img src="/assets/gail.png" alt="Logo"class="logo" width="120px" height="200px" >
+
+    <div class="min-h-screen flex items-center justify-center bg-gray-100">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold mb-6 text-center">Login</h1>
+            <form action="/login" method="post">
+                <div class="mb-4">
+                    <label for="username" class="block text-gray-700 font-medium mb-2">Email:</label>
+                    <input type="text" class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:border-blue-300" id="username" name="email" required>
+                </div>
+                <div class="mb-4">
+                    <label for="eid" class="block text-gray-700 font-medium mb-2">Password:</label>
+                    <input type="password" class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:border-blue-300" id="eid" name="password" required>
+                </div>
+               
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring focus:border-blue-300">Login</button>
+            </form>
+            <span>Dont have an account? <a href="/register">Register</a></span>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

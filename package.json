@@ -1,0 +1,35 @@
+{
+  "name": "attendance-web",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.7.4",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-mysql-session": "^3.0.3",
+    "express-session": "^1.18.0",
+    "fs": "^0.0.1-security",
+    "geofence": "^1.0.9",
+    "geolib": "^3.3.4",
+    "method-override": "^3.0.0",
+    "mysql2": "^3.11.5",
+    "nodemon": "^3.1.4",
+    "passport": "^0.7.0",
+    "passport-local": "^1.0.0",
+    "path": "^0.12.7",
+    "pdf-creator-node": "^2.3.5",
+    "pdfkit": "^0.15.0",
+    "socket.io": "^4.7.5"
+  }
+}
