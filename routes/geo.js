@@ -1,27 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const geolib = require('geolib');
-const mysql = require('mysql2');
-const axios = require('axios');
+const Attendance = require('../models/Attendance');
 
-// Set up MySQL connection
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10, // Adjust as needed
-    queueLimit: 0,
-  });
+const axios = require('axios');
+const dotenv = require('dotenv');
+dotenv.config();
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+
+
+
 
 async function callagra() {
     try {
-        const temporaryResponse = await axios.get('http://localhost:3000/user/temp-geos');
+        const temporaryResponse = await axios.get(`${API_BASE_URL}/user/temp-geos`);
         return temporaryResponse.data;
     } catch (error) {
         console.error('Error fetching temporary geofences:', error);
-        return []; // Return an empty array if there's an error fetching temporary geofences
+        return [];
     }
 }
 
@@ -36,7 +32,7 @@ router.post('/data', async (req, res) => {
         let minDistance = Infinity;
 
         try {
-            const permanentResponse = await axios.post('http://localhost:3000/admin-o/curr-geos');
+            const permanentResponse = await axios.post(`${API_BASE_URL}/admin-o/curr-geos`);
             permanentGeofences = permanentResponse.data;
         } catch (error) {
             console.error('Error fetching permanent geofences:', error);
@@ -95,58 +91,41 @@ router.post('/data', async (req, res) => {
 
         if (minDistance <= closestGeofence.radius) {
             console.log('Inside closest geofence');
-            db.query('SELECT * FROM attendance WHERE userid = ? AND date = ?', [userId, ourdate], (err, results) => {
-                if (err) {
-                    console.error('Error executing query:', err);
-                    return res.status(500).json({ message: 'Server error' });
-                }
-                if (results.length === 0) {
-                    db.query('INSERT INTO attendance (userid, status, date, signin_time, accounted_for, curr_loc) VALUES (?, ?, ?, ?, ?, ?)', 
-                    [userId, 'online', ourdate, currentTime, acc, closestGeofence.name], (err, results) => {
-                        if (err) {
-                            console.error('Error executing query:', err);
-                            return res.status(500).json({ message: 'Server error' });
-                        }
-                        res.json({ message: 'Inside closest geofence, attendance recorded' });
-                    });
+            // Check if attendance already exists for this user and date
+            const existing = await Attendance.findOne({ userid: userId, date: ourdate });
+            if (!existing) {
+                // Create new attendance record
+                await Attendance.create({
+                    userid: userId,
+                    status: 'online',
+                    date: ourdate,
+                    signin_time: currentTime,
+                    accounted_for: acc,
+                    curr_loc: closestGeofence.name
+                });
+                return res.json({ message: 'Inside closest geofence, attendance recorded' });
+            } else {
+                // Check if user has already checked out twice
+                const count = await Attendance.countDocuments({ date: ourdate, userid: userId, status: 'offline' });
+                if (count < 2) {
+                    // Update status to 'online' and clear signout_time
+                    await Attendance.updateOne(
+                        { userid: userId, date: ourdate },
+                        { $set: { status: 'online', signout_time: null } }
+                    );
+                    return res.json({ message: 'Inside closest geofence, status updated' });
                 } else {
-                    //start - Checking if the user has already checked out twice
-                    const doubleQuery = "SELECT COUNT(*) AS count FROM attendance WHERE date = ? AND userid = ? AND status = ?";
-                    db.query(doubleQuery, [ourdate, userId, "offline"], (err, rows) => {
-                        if (err) {
-                            console.error('Error executing query:', err);
-                            return res.status(500).json({ message: 'Server error' });
-                        }
-                        
-                        const count = rows[0].count;
-                        
-                        if (count < 2) {
-                            // If the user has not checked out more than twice, update the status to 'online'
-                            db.query('UPDATE attendance SET status = ?, signout_time = NULL WHERE userid = ? AND date = ?', 
-                                ['online', userId, ourdate], (err, results) => {
-                                if (err) {
-                                    console.error('Error executing query:', err);
-                                    return res.status(500).json({ message: 'Server error' });
-                                }
-                                res.json({ message: 'Inside closest geofence, status updated' });
-                            });
-                        } else {
-                            res.status(400).json({ message: 'Maximum check-ins/check-outs exceeded for today' });
-                        }
-                    });
-                    //end
+                    return res.status(400).json({ message: 'Maximum check-ins/check-outs exceeded for today' });
                 }
-            });
+            }
         } else {
             console.log('Outside closest geofence');
-            db.query('UPDATE attendance SET status = ?, signout_time = ? WHERE userid = ? AND date = ?', 
-            ['offline', currentTime, userId, ourdate], (err, results) => {
-                if (err) {
-                    console.error('Error executing query:', err);
-                    return res.status(500).json({ message: 'Server error' });
-                }
-                res.json({ message: 'Outside closest geofence, status updated' });
-            });
+            // Update status to 'offline' and set signout_time
+            await Attendance.updateOne(
+                { userid: userId, date: ourdate },
+                { $set: { status: 'offline', signout_time: currentTime } }
+            );
+            return res.json({ message: 'Outside closest geofence, status updated' });
         }
     } catch (error) {
         console.error('Unexpected error:', error);

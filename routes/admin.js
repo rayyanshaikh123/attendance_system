@@ -1,23 +1,13 @@
 const express = require('express');
 const Router = express.Router();
-const session = require('express-session');
-const MySQLStore = require('express-mysql-session')(session);
 const methodOverride = require('method-override');
-const mysql = require('mysql2');
+const User = require('../models/User');
+const Attendance = require('../models/Attendance');
 
 // Middleware setup
 Router.use(methodOverride('_method'));
 
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10, // Adjust as needed
-    queueLimit: 0,
-  });
-const sessionStore = new MySQLStore({}, db.promise());
+
 
 // Middleware to check if user is admin
 function isAdmin(req, res, next) {
@@ -33,51 +23,29 @@ Router.get('/login', (req, res) => {
 });
 
 // Admin dashboard route
-Router.get('/dashboard', isAdmin, (req, res) => {
-    const totalUsersQuery = 'SELECT COUNT(*) as count FROM users';
-    const onlineUsersQuery = "SELECT COUNT(DISTINCT userid) as count FROM attendance WHERE status = 'online'";
-
-    sessionStore.all((err, sessions) => {
-        if (err) {
-            console.error('Error fetching sessions:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
-        const loggedInUsers = Object.values(sessions).filter(session => session.passport && session.passport.user).length;
-
-        db.query(totalUsersQuery, (err, totalUsersResults) => {
-            if (err) {
-                console.error('Error fetching total users:', err);
-                res.status(500).send('Server Error');
-                return;
-            }
-            const totalUsers = totalUsersResults[0].count;
-
-            db.query(onlineUsersQuery, (err, onlineUsersResults) => {
-                if (err) {
-                    console.error('Error fetching online users:', err);
-                    res.status(500).send('Server Error');
-                    return;
-                }
-                const onlineUsers = onlineUsersResults[0].count;
-                const loggedOutUsers = totalUsers - onlineUsers;
-                res.render('dashboard', { totalUsers, loggedInUsers, loggedOutUsers, onlineUsers });
-            });
-        });
-    });
+Router.get('/dashboard', isAdmin, async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        const onlineUsers = await Attendance.distinct('userid', { status: 'online' });
+        // If you want to count logged-in users via session, you need to implement session tracking with MongoDB
+        const loggedInUsers = onlineUsers.length;
+        const loggedOutUsers = totalUsers - loggedInUsers;
+        res.render('dashboard', { totalUsers, loggedInUsers, loggedOutUsers, onlineUsers: loggedInUsers });
+    } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Route to get all users
-Router.get('/users', isAdmin, (req, res) => {
-    const query = "SELECT * FROM users;";
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching users:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
-        res.render('user', { users: results });
-    });
+Router.get('/users', isAdmin, async (req, res) => {
+    try {
+        const users = await User.find();
+        res.render('user', { users });
+    } catch (err) {
+        console.error('Error fetching users:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 
@@ -90,57 +58,38 @@ Router.get('/users/create', isAdmin, (req,res)=>{
 
 
 // Route to get a single user for updating
-Router.get('/users/:id', isAdmin, (req, res) => {
-    const { id } = req.params;
-    const query = "SELECT * FROM users WHERE id = ?;";
-    db.query(query, [id], (err, results) => {
-        if (err) {
-            console.error('Error fetching user:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
-        res.render('update', { users: results[0] });
-    });
+Router.get('/users/:id', isAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        res.render('update', { users: user });
+    } catch (err) {
+        console.error('Error fetching user:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Route to update a user
-Router.patch('/users/:id', isAdmin, (req, res) => {
-    const { id } = req.params;
-    const { username, email } = req.body;
-    const query = 'UPDATE users SET username = ?, email = ? WHERE id = ?';
-    db.query(query, [username, email, id], (err, results) => {
-        if (err) {
-            console.error('Error updating user:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
+Router.patch('/users/:id', isAdmin, async (req, res) => {
+    try {
+        const { username, email } = req.body;
+        await User.findByIdAndUpdate(req.params.id, { username, email });
         res.redirect('/admin/users');
-    });
+    } catch (err) {
+        console.error('Error updating user:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Route to delete a user
-Router.delete('/users/:id', isAdmin, (req, res) => {
-    const { id } = req.params;
-    const query = 'DELETE FROM users WHERE id = ?';
-    const query2 = 'DELETE FROM attendance WHERE userid = ?';
-    
-    db.query(query2, [id], (err, results) => {
-        if (err) {
-            console.error('Error deleting user:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
-        db.query(query, [id], (err, results) => {
-            if (err) {
-                console.error('Error deleting user:', err);
-                res.status(500).send('Server Error');
-                return;
-            }
-            
-            res.redirect('/admin/users');
-        });
-       
-    });
+Router.delete('/users/:id', isAdmin, async (req, res) => {
+    try {
+        await Attendance.deleteMany({ userid: req.params.id });
+        await User.findByIdAndDelete(req.params.id);
+        res.redirect('/admin/users');
+    } catch (err) {
+        console.error('Error deleting user:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Route to handle geo redirects
@@ -154,17 +103,24 @@ Router.get('/calendar', isAdmin, (req, res) => {
 });
 
 // Route to fetch calendar data
-Router.post('/calendar/:data', isAdmin, (req, res) => {
-    const { data } = req.params;
-    const query = 'SELECT u.*, a.accounted_for,a.signin_time,a.signout_time FROM users u JOIN attendance a ON u.id = a.userid WHERE a.date = ?';
-    db.query(query, [data], (err, results) => {
-        if (err) {
-            console.error('Error fetching calendar data:', err);
-            res.status(500).send('Server Error');
-            return;
-        }
+Router.post('/calendar/:data', isAdmin, async (req, res) => {
+    try {
+        const { data } = req.params;
+        const attendance = await Attendance.find({ date: data });
+        // Populate user info for each attendance record
+        const results = await Promise.all(attendance.map(async (a) => {
+            const user = await User.findById(a.userid);
+            return {
+                ...a.toObject(),
+                username: user ? user.username : '',
+                email: user ? user.email : '',
+            };
+        }));
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching calendar data:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 

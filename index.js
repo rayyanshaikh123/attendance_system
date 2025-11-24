@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const MySQLStore = require('express-mysql-session')(session);
+const MongoStore = require('connect-mongo');
 const bodyParser = require('body-parser');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
@@ -8,31 +8,24 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const mysql = require('mysql2');
+const mongoose = require('mongoose');
 dotenv.config();
 const { v4: uuidv4 } = require('uuid');
+const User = require('./models/User');
+const Attendance = require('./models/Attendance');
+const Geofence = require('./models/Geofence');
+const Request = require('./models/Request');
 const { Server } = require("socket.io");
 const { createServer } = require("http");
 
 const app = express();
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10, // Adjust as needed
-    queueLimit: 0,
-  });
-  
-  db.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error connecting to the database:', err);
-    } else {
-      console.log('Connected to the database!');
-      connection.release(); // Release connection back to the pool
-    }
-  });
+const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/attendance_system';
+mongoose.connect(mongoURI);
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+    console.log('Connected to MongoDB');
+});
 const adminEmail = process.env.ADMIN_EMAIL;
 const adminPassword = process.env.ADMIN_PASS;
 const server = createServer(app);
@@ -42,13 +35,14 @@ app.set('views', path.join(__dirname, '/views'));
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-const sessionStore = new MySQLStore({}, db.promise());
-
-const sessionMiddleware = session({ 
-    secret: 'your-secret-key', 
-    resave: false, 
-    saveUninitialized: false, 
-    store: sessionStore 
+const sessionMiddleware = session({
+    secret: 'your-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: mongoURI,
+        collectionName: 'sessions',
+    }),
 });
 
 app.use(sessionMiddleware);
@@ -67,28 +61,21 @@ app.use('/geo', require('./routes/geo'));
 app.use(express.static('public'));
 
 
-
 passport.use('user-local', new LocalStrategy(
     {
         usernameField: 'email',
         passwordField: 'password'
     },
-    (email, password, done) => {
-        const query = 'SELECT * FROM users WHERE email = ?';
-        db.query(query, [email], (err, results) => {
-            if (err) return done(err);
-            if (results.length === 0) return done(null, false, { message: 'Incorrect email.' });
-
-            const user = results[0];
-            bcrypt.compare(password, user.password, (err, isMatch) => {
-                if (err) return done(err);
-                if (isMatch) {
-                    return done(null, user);
-                } else {
-                    return done(null, false, { message: 'Incorrect password.' });
-                }
-            });
-        });
+    async (email, password, done) => {
+        try {
+            const user = await User.findOne({ email });
+            if (!user) return done(null, false, { message: 'Incorrect email.' });
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (isMatch) return done(null, user);
+            return done(null, false, { message: 'Incorrect password.' });
+        } catch (err) {
+            return done(err);
+        }
     }
 ));
 
@@ -110,15 +97,16 @@ passport.serializeUser((user, done) => {
     done(null, { id: user.id, type: user.type || 'user' });
 });
 
-passport.deserializeUser((obj, done) => {
+passport.deserializeUser(async (obj, done) => {
     if (obj.type === 'admin') {
         done(null, { id: obj.id, email: adminEmail, type: 'admin' });
     } else {
-        const query = 'SELECT * FROM users WHERE id = ?';
-        db.query(query, [obj.id], (err, results) => {
-            if (err) return done(err);
-            done(null, results[0]);
-        });
+        try {
+            const user = await User.findById(obj.id);
+            done(null, user);
+        } catch (err) {
+            done(err);
+        }
     }
 });
 
@@ -136,112 +124,16 @@ function isAdmin(req, res, next) {
     res.redirect('/admin/login');
 }
 
-app.get('/register', (req, res) => {
-    res.render('register');
-});
 
-app.get('/', (req, res) => {
-    res.render('cover');
-});
 
-app.get('/login', (req, res) => {
-    res.render('login');
-});
-
-app.get('/home', isAuthenticated, (req, res) => {
-    const admin = req.user.type === 'admin';
-    const userId = req.user.id;
-    const onlineUsersQuery = "SELECT COUNT(DISTINCT userid) as count FROM attendance WHERE status = 'online'";
-    const offlineUsersQuery = "SELECT COUNT(DISTINCT userid) as count FROM attendance WHERE status = 'offline'";
-    const totalFenceQuery = "SELECT COUNT(DISTINCT geoid) as count FROM geofence"
-    try {
-        db.query(onlineUsersQuery, (err, onlineUsersResults) => {
-            if (err) {
-                console.error('Error fetching online users:', err);
-                res.status(500).send('Server Error');
-                return;
-            }
-            const onlineUsers = onlineUsersResults[0].count;
-
-            db.query(offlineUsersQuery, (err, offUsersResults) => {
-                if (err) {
-                    console.error('Error fetching online users:', err);
-                    res.status(500).send('Server Error');
-                    return;
-                }
-                const offlineUsers = offUsersResults[0].count;
-                db.query(totalFenceQuery, (err, totalFenceResults) => {
-                    if (err) {
-                        console.error('Error fetching online users:', err);
-                        res.status(500).send('Server Error');
-                        return;
-                    }
-                    const totalFence = totalFenceResults[0].count;
-
-console.log(totalFence)
-
-                res.render('home', { admin, userId, offlineUsers, onlineUsers, totalFence });
-            });
-
-            });
-        });
-    } catch (error) {
-        console.error('Unexpected error:', error);
-        res.status(500).send('Server Error');
-    }
-});
-async function idmake(table, column) {
-    let id = uuidv4();
-    const query = `SELECT * FROM ${table} WHERE ${column} = ?`;
-
-    return new Promise((resolve, reject) => {
-        db.query(query, [id], (err, rows) => {
-            if (err) {
-                console.error('Error executing query:', err);
-                return reject(err);  // Reject the promise if there's an error
-            }
-
-            if (rows.length === 0) {
-                return resolve(id);  // Resolve the promise with the unique ID
-            } else {
-                // Recursively call idmake until a unique ID is found
-                idmake(table, column).then(resolve).catch(reject);
-            }
-        });
-    });
-}
-
-app.post('/signup', async (req, res) => {
-    let ide = await idmake("users", "id");
-    console.log(ide);
-    const { username, email, password } = req.body;
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const query = 'INSERT INTO users (id, username, email, password) VALUES (?, ?, ?, ?)';
-        db.query(query, [ide, username, email, hashedPassword], (err, results) => {
-            if (err) {
-                console.error('Error executing query:', err);
-                res.status(500).send('Server Error');
-                return;
-            }
-            console.log(results);
-            res.redirect('/admin/users');
-        });
-    } catch (err) {
-        console.error('Error hashing password:', err);
-        res.status(500).send('Server Error');
-    }
-});
 
 app.post('/login', (req, res, next) => {
-    console.log(req.body);
     passport.authenticate('user-local', (err, user, info) => {
         if (err) {
             console.error('Authentication error:', err);
             return next(err);
         }
         if (!user) {
-            console.log('Authentication failed:', info.message);
             return res.status(401).json({ message: 'Authentication failed', reason: info.message });
         }
         req.logIn(user, (err) => {
@@ -249,9 +141,13 @@ app.post('/login', (req, res, next) => {
                 console.error('Login error:', err);
                 return next(err);
             }
-            
-            console.log('Authentication successful');
-            return res.json({ message: 'Authentication successful', user });
+
+            // Redirect based on role; do not expose password in logs or responses
+            const role = user.role || user.type || 'user';
+            if (role === 'admin') {
+                return res.redirect('/admin/dashboard');
+            }
+            return res.redirect('/home');
         });
     })(req, res, next);
 });
@@ -262,8 +158,57 @@ app.post('/admin-login', passport.authenticate('admin-local', {
     failureRedirect: '/admin/login'
 }));
 
+// Public pages
+app.get('/', (req, res) => {
+    res.render('cover');
+});
+
+app.get('/login', (req, res) => {
+    res.render('login');
+});
+
+app.get('/register', (req, res) => {
+    res.render('register');
+});
+
+// Signup handler
+app.post('/signup', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) return res.status(400).send('Missing fields');
+        const exists = await User.findOne({ email });
+        if (exists) return res.status(400).send('User already exists');
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password, salt);
+        await User.create({ username, email, password: hash, role: 'user' });
+        return res.redirect('/login');
+    } catch (err) {
+        console.error('Signup error:', err);
+        return res.status(500).send('Server error');
+    }
+});
+
+app.get('/home', isAuthenticated, async (req, res) => {
+    try {
+        const isAdminUser = req.user && (req.user.type === 'admin' || req.user.role === 'admin');
+        if (isAdminUser) {
+            const totalFence = await Geofence.countDocuments();
+            const onlineUsersArr = await Attendance.distinct('userid', { status: 'online' });
+            const onlineUsers = onlineUsersArr.length;
+            const totalUsers = await User.countDocuments();
+            const offlineUsers = Math.max(0, totalUsers - onlineUsers);
+            return res.render('home', { user: req.user, admin: true, onlineUsers, offlineUsers, totalFence });
+        }
+
+        return res.render('home', { user: req.user, admin: false, userId: req.user.id });
+    } catch (err) {
+        console.error('Error rendering home:', err);
+        return res.status(500).send('Server error');
+    }
+});
+
 app.post('/logout', async (req, res) => {
-    const userId = req.user.id; // Assuming user ID is stored in req.user
+    const userId = req.user && req.user.id;
 
     if (!userId) {
         return res.status(401).send('User not authenticated');
@@ -275,59 +220,39 @@ app.post('/logout', async (req, res) => {
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const seconds = now.getSeconds().toString().padStart(2, '0');
     const currentTime = `${hours}:${minutes}:${seconds}`;
-    
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
     const day = now.getDate();
     const ourdate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
-    // Update attendance record to mark user as offline and set signout time
-    db.query('UPDATE attendance SET status = ?, signout_time = ? WHERE userid = ? AND date = ?', 
-    ['offline', currentTime, userId, ourdate], (err, results) => {
+    try {
+        await Attendance.updateOne({ userid: userId, date: ourdate }, { $set: { status: 'offline', signout_time: currentTime } });
+    } catch (err) {
+        console.error('Error updating attendance:', err);
+        // proceed to logout even if attendance update failed
+    }
+
+    req.logout((err) => {
         if (err) {
-            console.error('Error updating attendance:', err);
+            console.error('Error logging out:', err);
             return res.status(500).send('Server Error');
         }
-
-        req.logout((err) => {
-            if (err) {
-                console.error('Error logging out:', err);
-                return res.status(500).send('Server Error');
-            }
-            res.redirect('/');
-        });
+        res.redirect('/');
     });
 });
 
-process.on('SIGINT', () => {
-    db.end((err) => {
-        if (err) {
-            console.error('Error closing the database connection:', err);
-        }
-        console.log('Database connection closed');
-        process.exit();
-    });
-});
+// No MySQL connection to close. Mongoose will handle connections.
 
 app.get('/users', (req, res) => {
- let d= new Date()
- let a=d.getHours()
-console.log(d);
-console.log(a);
-
-
-const startHour = 9;
-const endHour = 18;
-
-
-
-
-
-
-let acc = (a >= startHour && a < endHour) ? "present" : "absent";
-db.query("select * from request",(err,rows)=>{
-    console.log(rows);
-})
+    (async () => {
+        try {
+            const users = await User.find().select('-password');
+            return res.json(users);
+        } catch (err) {
+            console.error('Error fetching users:', err);
+            return res.status(500).send('Server error');
+        }
+    })();
 
 });
 
